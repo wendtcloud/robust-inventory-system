@@ -1,186 +1,200 @@
-# 🎮 Unity Networked Inventory System
+# Unity Networked Inventory System
 
-A comprehensive, multiplayer-ready inventory management system for Unity built with **Unity Netcode for GameObjects**. Features drag-and-drop functionality, hotbar management, tooltips, and persistent runtime data.
+A production-ready, multiplayer inventory management system for Unity built on **Unity Netcode for GameObjects**. Designed with a decoupled service architecture, it supports server-authoritative state synchronization, drag-and-drop UI, hotbar equipment handling, and dynamic item runtime serialization.
 
-## ✨ Features
+---
 
-### 🌐 **Networked Inventory**
-- **Client-Server Architecture**: Full multiplayer support using Unity Netcode
-- **Real-time Synchronization**: Automatic syncing of inventory changes across clients
-- **Server Authority**: Secure server-side validation for all inventory operations
+## Technical Specifications
 
-### 🎯 **Drag & Drop System**
-- **Intuitive UI**: Smooth drag-and-drop item management
-- **Smart Stacking**: Automatic item merging and stack management
-- **Item Splitting**: Right-click to split item stacks
-- **Visual Feedback**: Live preview of dragged items
+### Network Architecture
+- **Server Authority**: All container mutations, item moves, and stack splits undergo server validation prior to execution.
+- **Delta Synchronization**: Transmits individual slot mutations over RPCs rather than full container state arrays to minimize bandwidth usage.
+- **State Reconciliation**: Automatically synchronizes full container contents upon initial client connection or reconnection.
 
-### 🔥 **Hotbar Management**
-- **Quick Access**: Numbered hotbar slots for fast item switching
-- **Active Item Display**: Visual representation of equipped items
-- **Runtime Data**: Persistent item properties and modifications
+### Core Features
+- **Drag & Drop Operations**: Left-click stack selection, right-click single-item deposition or stack division, and automatic stack merging based on item compatibility.
+- **Equipment & Hotbar Binding**: Active slot tracking, quick-swap key bindings, and context-sensitive item activation hooks.
+- **Dynamic Runtime Data**: JSON-serialized key-value dictionary attached to individual item instances to track dynamic state (e.g., durability, stats, enchantments).
+- **Decoupled Architecture**: Logic separated into core domain models, networking wrappers, UI views, and static/dynamic services.
 
-### 💾 **Data Persistence**
-- **Runtime Properties**: Custom data attached to individual items
-- **Serialization**: JSON-based data storage for network transmission
-- **Type Safety**: Automatic type conversion and validation
+---
 
-### 🎨 **UI Components**
-- **Tooltips**: Rich item information on hover
-- **Visual Indicators**: Active slot highlighting and status display
-- **Responsive Design**: Clean, modern interface elements
-
-## 🏗️ Architecture
-
-### Core Components
+## Directory Structure
 
 ```
-📁 Core System
-├── 🔧 ItemContainerCore - Business logic for inventory operations
-├── 🌐 NetworkItemContainer - Networked inventory container
-├── 📱 LocalItemContainer - Client-side inventory management
-├── 🎯 ItemContainerSlotUI - Individual slot management
-└── 📦 ItemContainerItemUI - Item data representation
+Core
+├── ItemContainerCore.cs             # Platform-agnostic container logic
+├── NetworkItemContainer.cs          # Netcode network behaviour wrapper
+├── LocalItemContainer.cs            # Client-side local inventory state
+├── ItemContainerSlotUI.cs           # UI view controller for inventory slots
+└── ItemContainerItemUI.cs           # Visual representation of item instances
 
-📁 Services
-├── 🔄 ItemDragService - Drag and drop operations
-├── ⚡ ItemOperationService - Item manipulation logic
-├── 🔥 HotbarService - Hotbar state management
-└── 💾 RuntimeDataOperationService - Dynamic data handling
+Services
+├── ItemDragService.cs               # Drag-and-drop state machine
+├── ItemOperationService.cs          # Operations for stacking, splitting, swapping
+├── HotbarService.cs                 # Active slot state and selection logic
+└── RuntimeDataOperationService.cs  # Serialization and modification of dynamic properties
 
-📁 Managers
-├── 📋 ItemContainersManager - Container registration and lookup
-├── 🎮 ItemDragManager - Global drag system coordinator
-└── 📚 ItemDatabaseManager - Item definitions and prefabs
+Management
+├── ItemContainersManager.cs         # Global registration registry for container GUIDs
+├── ItemDragManager.cs               # Screen-space drag visualization coordinator
+└── ItemDatabaseManager.cs           # Definition lookup and asset database
 ```
 
-## 🚀 Quick Start
+---
 
-### Prerequisites
+## Setup & Prerequisites
+
+### Dependencies
 - Unity 2022.3 LTS or higher
-- Unity Netcode for GameObjects package
-- TextMeshPro package
+- Unity Netcode for GameObjects (`com.unity.netcode.gameobjects`)
+- Unity TextMeshPro (`com.unity.textmeshpro`)
 
-### Installation
+### Installation Procedure
 
-1. **Clone the repository**
+1. **Clone Repository**
    ```bash
    git clone https://github.com/yourusername/unity-inventory-system.git
    ```
 
-2. **Import into Unity**
-   - Open Unity Hub
-   - Click "Add" and select the project folder
-   - Open the project
+2. **Package Configuration**
+   Verify `com.unity.netcode.gameobjects` is present in the Unity Package Manager.
 
-3. **Setup Netcode**
-   - Install Unity Netcode for GameObjects via Package Manager
-   - Configure NetworkManager in your scene
+3. **Scene Integration**
+   Ensure an active `NetworkManager` instance is configured within your starting scene.
 
-### Basic Setup
+---
 
-1. **Create an Inventory Container**
-   ```csharp
-   // For networked inventories
-   GameObject inventoryGO = new GameObject("NetworkInventory");
-   NetworkItemContainer container = inventoryGO.AddComponent<NetworkItemContainer>();
-   
-   // For local inventories
-   GameObject localInventoryGO = new GameObject("LocalInventory");
-   LocalStorage localStorage = localInventoryGO.AddComponent<LocalStorage>();
-   ```
+## Integration Guide
 
-2. **Configure Item Database**
-   - Create `ItemDatabase` ScriptableObject
-   - Add your item definitions
-   - Assign to `ItemDatabaseManager`
+### 1. Initializing Containers
 
-3. **Setup UI**
-   - Add inventory slots to your UI
-   - Connect `ItemContainerSlotUI` components
-   - Configure drag visualizer
+#### Networked Container
+Attach `NetworkItemContainer` to a GameObject with an attached `NetworkObject` component.
 
-## 📖 Usage Examples
-
-### Adding Items
 ```csharp
-// Add items to any container
-container.TryAddItem("sword_001", 1);
-container.TryAddItem("health_potion", 5);
+[RequireComponent(typeof(NetworkObject))]
+public class NetworkInventoryInitializer : MonoBehaviour
+{
+    [SerializeField] private NetworkItemContainer networkContainer;
+
+    private void Awake()
+    {
+        if (networkContainer == null)
+            networkContainer = GetComponent<NetworkItemContainer>();
+    }
+}
 ```
 
-### Hotbar Management
-```csharp
-// Set active hotbar slot
-LocalHotbarContainer hotbar = GetComponent<LocalHotbarContainer>();
-hotbar.SetActiveSlot(0);
+#### Local Container
+Use `LocalStorage` or `LocalItemContainer` for client-only UI panels, such as crafting menus or local chest previews.
 
-// Update item runtime data
-Dictionary<string, object> data = new Dictionary<string, object>
+```csharp
+public class LocalInventoryInitializer : MonoBehaviour
 {
-    ["durability"] = 85,
-    ["enchantment"] = "fire_damage"
-};
-hotbar.UpdateActiveItemRuntimeData(data);
+    [SerializeField] private LocalStorage localStorage;
+
+    private void Start()
+    {
+        localStorage.InitializeContainer(slotCount: 20);
+    }
+}
 ```
 
-### Custom Item Behaviors
+### 2. Item Mutations
+
 ```csharp
-public class CustomWeapon : MonoBehaviour, IHotbarItem, IRuntimeDataService
+// Server-side item insertion
+public void GrantLoot(NetworkItemContainer targetContainer, string itemId, int quantity)
 {
-    public int durability;
-    public string enchantment;
-    
+    if (!targetContainer.IsServer) return;
+
+    bool success = targetContainer.TryAddItem(itemId, quantity);
+    if (!success)
+    {
+        // Handle inventory full condition
+    }
+}
+```
+
+### 3. Dynamic Property Binding
+
+Implement `IRuntimeDataService` and `IHotbarItem` on wearable or usable item behaviours:
+
+```csharp
+public class WeaponEquipment : MonoBehaviour, IHotbarItem, IRuntimeDataService
+{
+    public int CurrentDurability { get; private set; }
+    public string ElementalType { get; private set; }
+
     public void InitializeFromRuntimeData(Dictionary<string, object> data)
     {
-        if (data.ContainsKey("durability"))
-            durability = (int)data["durability"];
-        if (data.ContainsKey("enchantment"))
-            enchantment = (string)data["enchantment"];
+        if (data.TryGetValue("durability", out object rawDurability))
+        {
+            CurrentDurability = System.Convert.ToInt32(rawDurability);
+        }
+
+        if (data.TryGetValue("element", out object rawElement))
+        {
+            ElementalType = rawElement as string;
+        }
     }
-    
+
     public void InitializeHotbar(LocalHotbarContainer hotbar)
     {
-        // Setup weapon-specific hotbar behavior
+        // Bind equipment-specific input listeners or animations
     }
 }
 ```
 
-## 🎯 Key Features Deep Dive
+---
 
-### 🌐 Network Synchronization
-The system uses Unity Netcode's `NetworkBehaviour` for seamless multiplayer support:
-- **Server Authority**: All inventory changes are validated server-side
-- **ClientRPC**: Efficient updates pushed to all clients
-- **Automatic Sync**: New players receive full inventory state on join
+## API Reference
 
-### 🔄 Drag & Drop System
-Advanced drag-and-drop with multiple interaction modes:
-- **Left Click**: Pick up entire stack
-- **Right Click**: Split stack or place single item
-- **Smart Merging**: Automatic stacking of compatible items
-- **Visual Feedback**: Real-time preview of drag operations
+### Key Interfaces
 
-### 💾 Runtime Data System
-Flexible data persistence for dynamic item properties:
-- **Type-Safe Serialization**: Automatic type conversion and validation
-- **Network Transmission**: Efficient JSON-based data sync
-- **Extensible**: Easy to add custom properties to any item
+#### `IItemContainerService`
+Defines operational contracts for container data manipulation.
 
-## 🛠️ Configuration
-
-### Item Database Setup
 ```csharp
-[CreateAssetMenu(fileName = "ItemDatabase", menuName = "Inventory/Item Database")]
-public class ItemDatabase : ScriptableObject
+public interface IItemContainerService
 {
-    public Dictionary<string, ItemDefinition> Database;
+    bool TryAddItem(string itemId, int amount);
+    bool TryRemoveItem(int slotIndex, int amount);
+    void ClearSlot(int slotIndex);
+    string GetContainerGUID();
 }
 ```
 
-### Container Configuration
+#### `IRuntimeDataService`
+Provides initialization contracts for items carrying unique instance state.
+
 ```csharp
-[CreateAssetMenu(fileName = "ContainerConfig", menuName = "Inventory/Container Config")]
+public interface IRuntimeDataService
+{
+    void InitializeFromRuntimeData(Dictionary<string, object> data);
+}
+```
+
+#### `IHotbarItem`
+Contract for items responding to active hotbar selection.
+
+```csharp
+public interface IHotbarItem
+{
+    void InitializeHotbar(LocalHotbarContainer hotbar);
+}
+```
+
+---
+
+## Configuration Assets
+
+### ScriptableObject Definitions
+
+#### Container Configuration
+```csharp
+[CreateAssetMenu(fileName = "ContainerConfig", menuName = "Inventory/Container Configuration")]
 public class ItemContainerConfig : ScriptableObject
 {
     public int MaxSlots = 20;
@@ -189,94 +203,14 @@ public class ItemContainerConfig : ScriptableObject
 }
 ```
 
-## 🎨 UI Customization
-
-### Slot Appearance
+#### Slot UI Style Configuration
 ```csharp
-[CreateAssetMenu(fileName = "SlotConfig", menuName = "Inventory/Slot UI Config")]
+[CreateAssetMenu(fileName = "SlotUIConfig", menuName = "Inventory/Slot UI Configuration")]
 public class ItemContainerSlotUIConfig : ScriptableObject
 {
-    public Sprite ActiveSlotIcon;
-    public Sprite PassiveSlotIcon;
-    public Color ActiveColor = Color.white;
-    public Color PassiveColor = Color.gray;
+    public Sprite DefaultSlotBackground;
+    public Sprite ActiveSlotBackground;
+    public Color NormalColor = Color.white;
+    public Color HighlightedColor = Color.yellow;
 }
 ```
-
-### Tooltip System
-```csharp
-// Automatic tooltip display on hover
-TooltipUI.Instance.SetItemName(item.ItemName);
-TooltipUI.Instance.SetItemDescription(item.Description);
-TooltipUI.Instance.SetTooltipActivity(true);
-```
-
-## 🔧 Advanced Features
-
-### Custom Item Types
-Implement `IHotbarItem` for specialized item behaviors:
-```csharp
-public interface IHotbarItem
-{
-    void InitializeHotbar(LocalHotbarContainer hotbar);
-}
-```
-
-### Runtime Data Services
-Use `IRuntimeDataService` for persistent item properties:
-```csharp
-public interface IRuntimeDataService
-{
-    void InitializeFromRuntimeData(Dictionary<string, object> data);
-}
-```
-
-### Container Services
-Create custom containers by implementing `IItemContainerService`:
-```csharp
-public interface IItemContainerService
-{
-    bool TryAddItem(string itemId, int amount);
-    void ClearSlot(int slotIndex);
-    string GetContainerGUID();
-}
-```
-
-## 🔍 Testing
-
-### Test Adding Items
-```csharp
-// Add test items (example from NetworkedStorage)
-private void Update()
-{
-    if (Input.GetKeyDown(KeyCode.T))
-    {
-        string[] testItems = { "metalore", "goldore" };
-        int randomIndex = Random.Range(0, testItems.Length);
-        TryAddItem(testItems[randomIndex], 1);
-    }
-}
-```
-
-### Debug Runtime Data
-```csharp
-// Monitor runtime data changes
-public class HotbarItem : MonoBehaviour, IHotbarItem
-{
-    private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.Mouse0))
-        {
-            hotbarItemIntProperty--;
-            runtimeDataOperationService.UpdateRuntimeDataValue("hotbarItemIntProperty", hotbarItemIntProperty);
-        }
-    }
-}
-```
-
-## 📊 Performance Considerations
-
-- **Efficient Networking**: Only syncs changes, not full state
-- **Smart Updates**: UI refreshes only when necessary
-- **Memory Management**: Proper cleanup of event subscriptions
-- **Scalable Architecture**: Service-based design for easy extension
